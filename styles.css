@@ -22,7 +22,6 @@ html, body{
   overflow:hidden;
   transform-origin: center center;
   transition: transform 0.05s linear;
-  touch-action: none; /* necesario para zoom/pan */
 }
 
 .mapa{
@@ -106,3 +105,4 @@ html, body{
     right:10px;
   }
 }
+
