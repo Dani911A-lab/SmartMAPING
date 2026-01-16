@@ -6,6 +6,7 @@ const canvasText = document.getElementById("textCanvas");
 const ctxText = canvasText.getContext("2d");
 
 const img = document.getElementById("mapa");
+const mapWrapper = document.getElementById("mapWrapper");
 
 // ================= HERRAMIENTAS =================
 const textBtn   = document.getElementById("textTool");
@@ -16,9 +17,11 @@ const eraserBtn = document.getElementById("eraserTool");
 const colorInput = document.getElementById("markerColor");
 const sizeInput  = document.getElementById("markerSize");
 
-let tool = "pen";
+// ================= ESTADO =================
+let tool = null;                  
 let drawing = false;
 let addingText = false;
+let isDrawingToolActive = false;
 
 // ================= TEXTO =================
 let texts = [];
@@ -29,7 +32,6 @@ let draggingText = false;
 let resizeCorner = null;
 
 // ================= RESIZE CANVAS =================
-// Solo aseguramos que los canvases sigan el tamaño de la imagen
 function resizeCanvas(){
   const rect = img.getBoundingClientRect();
   [canvasDraw, canvasText].forEach(c=>{
@@ -45,24 +47,37 @@ window.addEventListener("resize", resizeCanvas);
 img.onload = resizeCanvas;
 resizeCanvas();
 
-
-// ================= TOOLS =================
-function activate(btn){
-  [textBtn, penBtn, markerBtn, eraserBtn].forEach(b=>b.classList.remove("active"));
-  btn.classList.add("active");
-  updateDrawingFlag();
+// ================= TOGGLE HERRAMIENTAS =================
+function toggleTool(selectedTool, btn){
+  if(tool === selectedTool){
+    tool = null;
+    isDrawingToolActive = false;
+    btn.classList.remove("active");
+  } else {
+    tool = selectedTool;
+    isDrawingToolActive = true;
+    [penBtn, markerBtn, eraserBtn].forEach(b=>{
+      if(b!==btn) b.classList.remove("active");
+    });
+    btn.classList.add("active");
+  }
+  activeText = null;
+  addingText = false;
 }
 
-textBtn.onclick = () => { tool = "text"; addingText = true; activate(textBtn); };
-penBtn.onclick = () => { tool="pen"; activeText=null; addingText=false; activate(penBtn); };
-markerBtn.onclick = () => { tool="marker"; activeText=null; addingText=false; activate(markerBtn); };
-eraserBtn.onclick = () => { tool="eraser"; activeText=null; addingText=false; activate(eraserBtn); };
+// Botones toggle
+penBtn.addEventListener("click", ()=> toggleTool("pen", penBtn));
+markerBtn.addEventListener("click", ()=> toggleTool("marker", markerBtn));
+eraserBtn.addEventListener("click", ()=> toggleTool("eraser", eraserBtn));
 
-// Flag para saber si la herramienta activa es lápiz/marker/eraser
-let isDrawingToolActive = tool === "pen" || tool === "marker" || tool === "eraser";
-function updateDrawingFlag() {
-  isDrawingToolActive = tool === "pen" || tool === "marker" || tool === "eraser";
-}
+// Texto independiente
+textBtn.addEventListener("click", ()=>{
+  tool = "text";
+  addingText = true;
+  activeText = null;
+  [penBtn, markerBtn, eraserBtn].forEach(b=>b.classList.remove("active"));
+  isDrawingToolActive = false;
+});
 
 // ================= POSICIÓN =================
 function getPos(e){
@@ -128,20 +143,21 @@ function start(e){
     if(addingText){
       const txt = prompt("Texto:");
       if(txt){
-        const newText = {
+        texts.push({
           text: txt,
           x: p.x,
           y: p.y,
           size: Number(sizeInput.value)+6,
           color: colorInput.value
-        };
-        texts.push(newText);
+        });
         redrawTextCanvas();
       }
       addingText = false;
     }
     return;
   }
+
+  if(!isDrawingToolActive) return;
 
   drawing = true;
   ctxDraw.beginPath();
@@ -262,60 +278,61 @@ let lastDist = null;
 let lastPan = null;
 let offsetX = 0;
 let offsetY = 0;
+let scale = 1;
 
-const updateZoomPan = () => {
-  mapWrapper.addEventListener("touchstart", e => {
-    if(e.touches.length === 2){
-      lastDist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-    } else if(e.touches.length === 1 && scale > 1 && !isDrawingToolActive){
-      lastPan = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    }
-  }, {passive:false});
+mapWrapper.addEventListener("touchstart", e=>{
+  if(e.touches.length === 2){
+    lastDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    // Al hacer zoom → desactivar herramientas
+    tool = null;
+    isDrawingToolActive = false;
+    [penBtn, markerBtn, eraserBtn].forEach(b=>b.classList.remove("active"));
+  } else if(e.touches.length === 1 && scale > 1 && !isDrawingToolActive){
+    lastPan = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+  }
+}, {passive:false});
 
-  mapWrapper.addEventListener("touchmove", e => {
-    if(e.touches.length === 2){
-      e.preventDefault();
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      if(lastDist){
-        let factor = dist / lastDist;
-        scale *= factor;
-        scale = Math.min(Math.max(scale, 1), 4);
-        applyTransform();
-      }
-      lastDist = dist;
-    } else if(e.touches.length === 1 && scale > 1 && lastPan && !isDrawingToolActive){
-      e.preventDefault();
-      const dx = e.touches[0].clientX - lastPan.x;
-      const dy = e.touches[0].clientY - lastPan.y;
-      offsetX += dx;
-      offsetY += dy;
-
-      const rect = mapWrapper.getBoundingClientRect();
-      const maxX = (rect.width * (scale - 1)) / 2;
-      const maxY = (rect.height * (scale - 1)) / 2;
-      offsetX = Math.max(-maxX, Math.min(maxX, offsetX));
-      offsetY = Math.max(-maxY, Math.min(maxY, offsetY));
-
+mapWrapper.addEventListener("touchmove", e=>{
+  if(e.touches.length === 2){
+    e.preventDefault();
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    if(lastDist){
+      let factor = dist / lastDist;
+      scale *= factor;
+      scale = Math.min(Math.max(scale, 1), 4);
       applyTransform();
-      lastPan.x = e.touches[0].clientX;
-      lastPan.y = e.touches[0].clientY;
     }
-  }, {passive:false});
+    lastDist = dist;
+  } else if(e.touches.length === 1 && scale > 1 && lastPan && !isDrawingToolActive){
+    e.preventDefault();
+    const dx = e.touches[0].clientX - lastPan.x;
+    const dy = e.touches[0].clientY - lastPan.y;
+    offsetX += dx;
+    offsetY += dy;
 
-  mapWrapper.addEventListener("touchend", e => {
-    if(e.touches.length < 2) lastDist = null;
-    if(e.touches.length === 0) lastPan = null;
-  });
-};
-updateZoomPan();
+    const rect = mapWrapper.getBoundingClientRect();
+    const maxX = (rect.width * (scale - 1)) / 2;
+    const maxY = (rect.height * (scale - 1)) / 2;
+    offsetX = Math.max(-maxX, Math.min(maxX, offsetX));
+    offsetY = Math.max(-maxY, Math.min(maxY, offsetY));
+
+    applyTransform();
+    lastPan.x = e.touches[0].clientX;
+    lastPan.y = e.touches[0].clientY;
+  }
+}, {passive:false});
+
+mapWrapper.addEventListener("touchend", e=>{
+  if(e.touches.length < 2) lastDist = null;
+  if(e.touches.length === 0) lastPan = null;
+});
 
 function applyTransform(){
   mapWrapper.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
 }
-
