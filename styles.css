@@ -9,7 +9,7 @@ html, body{
   height:100%;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   background:#f2f2f2;
-  overflow:hidden;
+  overflow:hidden; /* Se mantiene para el canvas completo */
 }
 
 .map-wrapper{
@@ -20,8 +20,7 @@ html, body{
   justify-content:center;
   align-items:center;
   overflow:hidden;
-  transform-origin: center center;
-  transition: transform 0.05s linear;
+  touch-action:none; /* manejaremos zoom y pan con JS */
 }
 
 .mapa{
@@ -32,13 +31,11 @@ html, body{
   -webkit-user-drag:none;
 }
 
-#drawCanvas,
-#textCanvas{
+canvas{
   position:absolute;
   top:0;
   left:0;
   z-index:10;
-  touch-action:none;
 }
 
 #textCanvas{
@@ -50,11 +47,9 @@ html, body{
   top:14px;
   right:14px;
   z-index:50;
-
   display:flex;
   gap:6px;
   padding:6px;
-
   background:rgba(255,255,255,.85);
   border-radius:10px;
   box-shadow:0 4px 14px rgba(0,0,0,.15);
@@ -66,19 +61,19 @@ html, body{
   height:36px;
   border:none;
   border-radius:8px;
-  background:transparent;
+  background:rgba(255,255,255,0.6); /* por defecto desactivado */
   font-size:18px;
   cursor:pointer;
-
   display:flex;
   align-items:center;
   justify-content:center;
-
-  transition: background .15s ease, transform .15s ease;
+  transition: background .15s ease, transform .15s ease, box-shadow .15s ease;
 }
 
 .toolbox button.active{
-  background:rgba(0,0,0,.15);
+  background: #1e88e5;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
 .toolbox button:active{
@@ -105,4 +100,3 @@ html, body{
     right:10px;
   }
 }
-
