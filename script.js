@@ -29,6 +29,7 @@ let draggingText = false;
 let resizeCorner = null;
 
 // ================= RESIZE CANVAS =================
+// Solo aseguramos que los canvases sigan el tamaño de la imagen
 function resizeCanvas(){
   const rect = img.getBoundingClientRect();
   [canvasDraw, canvasText].forEach(c=>{
@@ -39,11 +40,11 @@ function resizeCanvas(){
     c.style.top = rect.top+"px";
     c.style.left = rect.left+"px";
   });
-  redrawTextCanvas();
 }
 window.addEventListener("resize", resizeCanvas);
 img.onload = resizeCanvas;
 resizeCanvas();
+
 
 // ================= TOOLS =================
 function activate(btn){
@@ -317,3 +318,4 @@ updateZoomPan();
 function applyTransform(){
   mapWrapper.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
 }
+
